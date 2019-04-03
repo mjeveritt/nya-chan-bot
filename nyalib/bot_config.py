@@ -25,8 +25,8 @@ class ReadOnlyDictAttributeAccess(dict):
 
 
 class BotConfig(object):
-    def __init__(self, **kargs):
-        self.bot = copy(kargs)
+    def __init__(self, **kwargs):
+        self.bot = copy(kwargs)
 
     @property
     def description(self):
@@ -49,17 +49,34 @@ class BotConfig(object):
         # Ensures owner is always available.
         cogs = self.bot.get('startup_cogs')
         if not cogs:
+            # Fill cog variable with all cogs in `cogs/`
             cogs = [
-                f.replace('.py', '')
+                {"file": f.replace('.py', ''), "in_cogs": True}
                 for f in os.listdir("cogs")
-                if os.path.isfile(os.path.join("cogs", f)) and f.split(".")[-1] == "py"
+                if os.path.isfile(os.path.join("cogs", f)) and
+                f.split(".")[-1] == "py" and
+                f.split(".")[-2] != "base_cog"
             ]
-            cogs.remove("base_cog")
-            cogs.remove("__init__")
-        elif 'owner' not in cogs:
+
+            if os.getenv("DEBUG"):
+                cogs.append({"file": "jishaku", "in_cogs": False})
+
+            return cogs
+
+        if 'owner' not in cogs and os.path.isfile(os.path.join("cogs", "owner")):
+            # Append owner cog
             cogs.append('owner')
 
-        return cogs
+        if os.getenv("DEBUG") and "jishaku" not in cogs:
+            # Append testing cog
+            cogs.append("jishaku")
+
+        return [
+            {"file": f.replace('.py', ''), "in_cogs": os.path.isfile(os.path.join("cogs", f"{f}.py"))}
+            for f in cogs
+            if "base_cog" not in f
+        ]
+
 
     @property
     def token(self):
@@ -67,7 +84,7 @@ class BotConfig(object):
 
     @property
     def subcommands_in_help(self):
-        return self.bot.get('subcommands_in_help').lower()[0] == "y"
+        return self.bot.get('subcommands_in_help', 'n').lower()[0] == "y"
 
     @property
     def channel(self):
